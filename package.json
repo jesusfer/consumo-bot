@@ -1,0 +1,24 @@
+{
+  "name": "consumo-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot that stores fuel consumption",
+  "main": "src/bot.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jesusfer/consumo-bot.git"
+  },
+  "keywords": [
+    "telegram",
+    "bot"
+  ],
+  "author": "Jesus Fernandez <jesus@nublar.net>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jesusfer/consumo-bot/issues"
+  },
+  "homepage": "https://github.com/jesusfer/consumo-bot#readme",
+  "dependencies": {
+    "azure-storage": "^2.10.2",
+    "node-telegram-bot-api": "^0.30.0"
+  }
+}
