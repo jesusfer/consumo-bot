@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/jesusfer/consumo-bot#readme",
   "dependencies": {
-    "azure-storage": "^2.10.2",
-    "node-telegram-bot-api": "^0.30.0"
+    "azure-storage": "^2.10.3",
+    "node-telegram-bot-api": "^0.40.0"
   }
 }
