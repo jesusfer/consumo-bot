@@ -57,7 +57,7 @@ bot.onText(/\/new .*/, message => {
         }
         storage.NewReading(message.from.id, volume, price, distance, partial, date)
             .then(result => {
-                let msg = `Reading #${result.RowId}: ${distance} km, ${volume} l at ${price} €/l on ${date.toDateString()}`;
+                let msg = `Reading #${result.ReadingId}: ${distance} km, ${volume} l at ${price} €/l on ${date.toDateString()}`;
                 bot.sendMessage(message.from.id, msg);
                 d(`${msg} (User: ${message.from.id})`);
             })
