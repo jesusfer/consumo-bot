@@ -3,7 +3,7 @@
 
 const d = require("debug")("bot-bot");
 import {config} from "./config";
-const TelegramBot = require("node-telegram-bot-api");
+import TelegramBot from "node-telegram-bot-api";
 import {AzStorage} from "./azure";
 
 const storage = new AzStorage({
@@ -85,11 +85,11 @@ bot.onText(/\/new .*/, (message) => {
 });
 
 bot.onText(/\/stats/, (message) => {
-  // TODO
+  // TODO:
 });
 
 bot.onText(/\/clear/, (message) => {
-  // TODO
+  // TODO:
 });
 
 // FUTURE: Handle updating last message -> update last reading?

@@ -86,7 +86,7 @@ export class AzStorage implements AzStorageOptions {
     });
   }
 
-  UpdateUserLastReading(user, rowId): Promise<any> {
+  UpdateUserLastReading(user: number, rowId: number): Promise<any> {
     let partition = `LastUserRowKey`;
     let row = `User_${user}`;
     let entity = {
@@ -107,7 +107,7 @@ export class AzStorage implements AzStorageOptions {
   }
 
   async NewReading(
-    user: string,
+    user: number,
     volume: number,
     price: number,
     distance: number,
@@ -135,7 +135,7 @@ export class AzStorage implements AzStorageOptions {
     return result;
   }
 
-  ClearReadings(user: string) {}
+  ClearReadings(user: number) {}
 
-  Stats(user: string) {}
+  Stats(user: number) {}
 }
