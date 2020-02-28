@@ -2,94 +2,96 @@
 // MIT License
 
 const d = require("debug")("bot-bot");
-import {config} from "./config";
-import TelegramBot from "node-telegram-bot-api";
+import {IConfiguration} from "./config";
+import TelegramBot, {Message} from "node-telegram-bot-api";
 import {AzStorage} from "./azure";
 
-const storage = new AzStorage({
-  storageAccount: config.AzureAccount,
-  storageKey: config.AzureKey,
-  tableName: config.AzureTableName,
-});
+export class ConsumoBot extends TelegramBot {
+  private configuration: IConfiguration;
+  private storage: AzStorage;
+  private helpText = "This bot stores fuel consumption";
 
-d(`Allowed users: ${config.AllowedUsers}`);
-d(`Table name: ${config.AzureTableName}`);
-
-export const bot = new TelegramBot(config.BotToken, {
-  polling: true,
-});
-
-const helpText = "This bot stores fuel consumption";
-function isAllowedUser(message) {
-  if (!config.AllowedUsers.includes(message.from.id)) {
-    bot.sendMessage(message.from.id, "Sorry, you are not allowed to use this service");
-    d(`User ${message.from.id} tried to use the service.`);
-    return false;
+  constructor(configuration: IConfiguration) {
+    super(configuration.BotToken, {polling: true});
+    this.configuration = configuration;
+    this.storage = new AzStorage({
+      storageAccount: configuration.AzureAccount,
+      storageKey: configuration.AzureKey,
+      tableName: configuration.AzureTableName,
+    });
+    d(`Allowed users: ${configuration.AllowedUsers}`);
+    d(`Table name: ${configuration.AzureTableName}`);
+    this.SetupCommands();
   }
-  return true;
-}
 
-/**
- * Available commands:
- * - start: register a new user
- * - new: store a new reading
- * - stats: print summary stats
- * - clear: clear all info from the user
- */
-bot.onText(/\/start/, (message) => {
-  if (!isAllowedUser(message)) {
-    return;
+  private IsAllowedUser(message: Message): boolean {
+    if (!this.configuration.AllowedUsers.includes(message.from.id)) {
+      this.sendMessage(message.from.id, "Sorry, you are not allowed to use this service");
+      d(`User ${message.from.id} tried to use the service.`);
+      return false;
+    }
+    return true;
   }
-  bot.sendMessage(message.from.id, helpText);
-});
 
-const messageRE = new RegExp("^/new (\\d+) (\\d*.?\\d*) (\\d*.?\\d*)( partial)?( \\d{8})?");
-const dateRE = new RegExp("(\\d{2})(\\d{2})(\\d{4})");
+  private messageRE = new RegExp("^/new (\\d+) (\\d*.?\\d*) (\\d*.?\\d*)( partial)?( \\d{8})?");
+  private dateRE = new RegExp("(\\d{2})(\\d{2})(\\d{4})");
+  private SetupCommands(): void {
+    /**
+     * Available commands:
+     * - start: register a new user
+     * - new: store a new reading
+     * - stats: print summary stats
+     * - clear: clear all info from the user
+     */
+    this.onText(/\/start/, (message: Message) => {
+      if (!this.IsAllowedUser(message)) {
+        return;
+      }
+      this.sendMessage(message.from.id, this.helpText);
+    });
+    this.onText(/\/new .*/, (message: Message) => this.HandleNewMessage(message));
+    this.onText(/\/stats/, (message: Message) => {
+      // TODO:
+    });
 
-bot.onText(/\/new .*/, (message) => {
-  if (!isAllowedUser(message)) {
-    return;
+    this.onText(/\/clear/, (message: Message) => {
+      // TODO:
+    });
   }
-  let match = messageRE.exec(message.text);
-  if (match) {
+
+  private async HandleNewMessage(message: Message): Promise<void> {
+    if (!this.IsAllowedUser(message)) {
+      return;
+    }
+    let match = this.messageRE.exec(message.text);
+    if (!match) {
+      this.sendMessage(message.from.id, "I did not understand your message");
+      d(`Message parsing error (User:${message.from.id}) Message:${message.text}`);
+      return;
+    }
     let [, distance, volume, price, partialString, dateString] = match;
     let partial = partialString != undefined;
     let date = new Date(Date.now());
     if (dateString != undefined) {
-      let [, day, month, year] = dateRE.exec(dateString.trim());
+      let [, day, month, year] = this.dateRE.exec(dateString.trim());
       date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
     }
-    storage
-      .NewReading(
-        message.from.id,
-        parseInt(volume),
-        parseInt(price),
-        parseInt(distance),
+    try {
+      let reading = {
+        user: message.from.id,
+        volume: parseInt(volume),
+        price: parseInt(price),
+        distance: parseInt(distance),
         partial,
-        date
-      )
-      .then((result) => {
-        let msg = `Reading #${
-          result.ReadingId
-        }: ${distance} km, ${volume} l at ${price} €/l on ${date.toDateString()}`;
-        bot.sendMessage(message.from.id, msg);
-        d(`${msg} (User: ${message.from.id})`);
-      })
-      .catch((error) => {
-        d(`There was an error saving the reading: ${error}`);
-      });
-  } else {
-    bot.sendMessage(message.from.id, "I did not understand your message");
-    d(`Message parsing error (User:${message.from.id}) Message:${message.text}`);
+        date,
+      };
+      let readingId = await this.storage.NewReading(reading);
+      let msg = `Reading #${readingId}: ${distance} km, ${volume} l at ${price} €/l on ${date.toDateString()}`;
+      this.sendMessage(message.from.id, msg);
+      d(`${msg} (User: ${message.from.id})`);
+    } catch (error) {
+      d(`There was an error saving the reading: ${error}`);
+    }
   }
-});
-
-bot.onText(/\/stats/, (message) => {
-  // TODO:
-});
-
-bot.onText(/\/clear/, (message) => {
-  // TODO:
-});
-
+}
 // FUTURE: Handle updating last message -> update last reading?

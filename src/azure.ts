@@ -12,6 +12,15 @@ interface AzStorageOptions {
   tableName: string;
 }
 
+interface IReading {
+  user: number;
+  volume: number;
+  price: number;
+  distance: number;
+  partial?: boolean;
+  date?: Date;
+}
+
 export class AzStorage implements AzStorageOptions {
   public storageAccount: string;
   public storageKey: string;
@@ -47,7 +56,7 @@ export class AzStorage implements AzStorageOptions {
     });
   }
 
-  async GetNextReadingId(user): Promise<number> {
+  async GetNextReadingId(user: number): Promise<number> {
     if (!this.initialized) {
       await this.Init();
     }
@@ -106,33 +115,27 @@ export class AzStorage implements AzStorageOptions {
     });
   }
 
-  async NewReading(
-    user: number,
-    volume: number,
-    price: number,
-    distance: number,
-    partial: boolean = false,
-    date: Date = new Date(Date.now())
-  ): Promise<any> {
+  async NewReading(reading: IReading): Promise<number> {
     if (!this.initialized) {
       await this.Init();
     }
+
     let partition = "UserReadings";
-    let rowId = await this.GetNextReadingId(user);
-    let rowKey = `Reading_${user}_${rowId}`;
+    let rowId = await this.GetNextReadingId(reading.user);
+    let rowKey = `Reading_${reading.user}_${rowId}`;
     let entity = {
       PartitionKey: entGen.String(partition),
       RowKey: entGen.String(rowKey),
-      Distance: entGen.Int32(distance),
-      Volume: entGen.Double(volume),
-      Price: entGen.Double(price),
-      Partial: entGen.Boolean(partial),
-      Date: entGen.DateTime(date),
+      Distance: entGen.Int32(reading.distance),
+      Volume: entGen.Double(reading.volume),
+      Price: entGen.Double(reading.price),
+      Partial: entGen.Boolean(reading.partial ?? false),
+      Date: entGen.DateTime(reading.date ?? new Date(Date.now())),
     };
 
     await this.AddEntity(entity);
-    let result = await this.UpdateUserLastReading(user, rowId);
-    return result;
+    await this.UpdateUserLastReading(reading.user, rowId);
+    return rowId;
   }
 
   ClearReadings(user: number) {}
