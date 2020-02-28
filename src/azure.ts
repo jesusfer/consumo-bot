@@ -1,40 +1,53 @@
-// Copyright (c) 2018 Jesús Fernández <jesus@nublar.net>
+// Copyright (c) 2020 Jesús Fernández <jesus@nublar.net>
 // MIT License
-
-"use strict";
 
 const d = require("debug")("bot-azure");
 
 const azure = require("azure-storage");
 const entGen = azure.TableUtilities.entityGenerator;
 
-class AzStorage {
-  constructor(options) {
-    this.storageAccount = options.storageAccount;
-    this.storageKey = options.storageKey;
-    this.tableName = options.tableName;
+interface AzStorageOptions {
+  storageAccount: string;
+  storageKey: string;
+  tableName: string;
+}
+
+export class AzStorage implements AzStorageOptions {
+  public storageAccount: string;
+  public storageKey: string;
+  public tableName: string;
+  private initialized: boolean;
+
+  private svc: any; // TODO:
+
+  constructor(options: AzStorageOptions) {
+    Object.assign(this, options);
+    // this.storageAccount = options.storageAccount;
+    // this.storageKey = options.storageKey;
+    // this.tableName = options.tableName;
     this.initialized = false;
   }
 
-  Init() {
-    if (this.svc == undefined) {
-      this.svc = azure.createTableService(this.storageAccount, this.storageKey);
-      return new Promise((resolve, reject) => {
-        this.svc.createTableIfNotExists(this.tableName, (error, result) => {
-          if (error) {
-            console.error(`Cannot create destination table: ${result}`);
-            reject(error);
-          } else {
-            d(`Table ${this.tableName} exists in AzAccount`);
-            this.initialized = true;
-            resolve(true);
-          }
-        });
-      });
+  private Init(): Promise<boolean> {
+    if (this.svc != undefined) {
+      return Promise.resolve(true);
     }
+    this.svc = azure.createTableService(this.storageAccount, this.storageKey);
+    return new Promise((resolve, reject) => {
+      this.svc.createTableIfNotExists(this.tableName, (error, result) => {
+        if (error) {
+          console.error(`Cannot create destination table: ${result}`);
+          reject(error);
+        } else {
+          d(`Table ${this.tableName} exists in AzAccount`);
+          this.initialized = true;
+          resolve(true);
+        }
+      });
+    });
   }
 
-  async GetNextReadingId(user) {
+  async GetNextReadingId(user): Promise<number> {
     if (!this.initialized) {
       await this.Init();
     }
@@ -57,7 +70,7 @@ class AzStorage {
     });
   }
 
-  async AddEntity(entity) {
+  async AddEntity(entity): Promise<void> {
     if (!this.initialized) {
       await this.Init();
     }
@@ -73,7 +86,7 @@ class AzStorage {
     });
   }
 
-  UpdateUserLastReading(user, rowId) {
+  UpdateUserLastReading(user, rowId): Promise<any> {
     let partition = `LastUserRowKey`;
     let row = `User_${user}`;
     let entity = {
@@ -93,7 +106,14 @@ class AzStorage {
     });
   }
 
-  async NewReading(user, volume, price, distance, partial = false, date = new Date(Date.now())) {
+  async NewReading(
+    user: string,
+    volume: number,
+    price: number,
+    distance: number,
+    partial: boolean = false,
+    date: Date = new Date(Date.now())
+  ): Promise<any> {
     if (!this.initialized) {
       await this.Init();
     }
@@ -115,9 +135,7 @@ class AzStorage {
     return result;
   }
 
-  ClearReadings(user) {}
+  ClearReadings(user: string) {}
 
-  Stats(user) {}
+  Stats(user: string) {}
 }
-
-module.exports = AzStorage;

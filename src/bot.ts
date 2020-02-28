@@ -1,23 +1,27 @@
-// Copyright (c) 2018 Jesús Fernández <jesus@nublar.net>
+// Copyright (c) 2020 Jesús Fernández <jesus@nublar.net>
 // MIT License
 
-"use strict";
-
 const d = require("debug")("bot-bot");
-const config = require("./config");
+import {config} from "./config";
 const TelegramBot = require("node-telegram-bot-api");
-const AzAccount = require("./azure");
+import {AzStorage} from "./azure";
 
-const storage = new AzAccount(config.azureAccount, config.azureKey, config.azureTable);
+const storage = new AzStorage({
+  storageAccount: config.AzureAccount,
+  storageKey: config.AzureKey,
+  tableName: config.AzureTableName,
+});
 
-d(`Allowed users: ${config.allowedUsers}`);
-const bot = new TelegramBot(config.token, {
+d(`Allowed users: ${config.AllowedUsers}`);
+d(`Table name: ${config.AzureTableName}`);
+
+export const bot = new TelegramBot(config.BotToken, {
   polling: true,
 });
-const helpText = "This bot stores fuel consumption";
 
+const helpText = "This bot stores fuel consumption";
 function isAllowedUser(message) {
-  if (!config.allowedUsers.includes(message.from.id)) {
+  if (!config.AllowedUsers.includes(message.from.id)) {
     bot.sendMessage(message.from.id, "Sorry, you are not allowed to use this service");
     d(`User ${message.from.id} tried to use the service.`);
     return false;
@@ -48,15 +52,22 @@ bot.onText(/\/new .*/, (message) => {
   }
   let match = messageRE.exec(message.text);
   if (match) {
-    let [, distance, volume, price, partial, dateString] = match;
-    partial = partial != undefined;
+    let [, distance, volume, price, partialString, dateString] = match;
+    let partial = partialString != undefined;
     let date = new Date(Date.now());
     if (dateString != undefined) {
       let [, day, month, year] = dateRE.exec(dateString.trim());
-      date = new Date(Date.UTC(year, month - 1, day));
+      date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
     }
     storage
-      .NewReading(message.from.id, volume, price, distance, partial, date)
+      .NewReading(
+        message.from.id,
+        parseInt(volume),
+        parseInt(price),
+        parseInt(distance),
+        partial,
+        date
+      )
       .then((result) => {
         let msg = `Reading #${
           result.ReadingId
@@ -82,5 +93,3 @@ bot.onText(/\/clear/, (message) => {
 });
 
 // FUTURE: Handle updating last message -> update last reading?
-
-module.exports = bot;

@@ -1,9 +1,7 @@
-// Copyright (c) 2018 Jesús Fernández <jesus@nublar.net>
+// Copyright (c) 2020 Jesús Fernández <jesus@nublar.net>
 // MIT License
 
-"use strict";
-
-const bot = require("./bot");
+import {bot} from "./bot";
 
 console.log("Bot started: " + new Date().toUTCString());
 

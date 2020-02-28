@@ -20,5 +20,9 @@
   "dependencies": {
     "azure-storage": "^2.10.3",
     "node-telegram-bot-api": "^0.40.0"
+  },
+  "devDependencies": {
+    "@types/node": "^13.7.6",
+    "typescript": "^3.8.2"
   }
 }
