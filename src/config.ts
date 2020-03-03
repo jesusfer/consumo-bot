@@ -3,16 +3,21 @@
 
 export interface IConfiguration {
   BotToken: string;
-  AzureAccount: string;
-  AzureKey: string;
-  AzureTableName: string;
   AllowedUsers: number[];
 }
 
-export const Configuration: IConfiguration = {
-  BotToken: process.env.TELEGRAM_BOT_TOKEN,
-  AzureAccount: process.env.AZURE_STORAGE_ACCOUNT,
-  AzureKey: process.env.AZURE_STORAGE_KEY,
-  AzureTableName: process.env.AZURE_TABLE_NAME,
-  AllowedUsers: process.env.TELEGRAM_ALLOWED_USERS.split(",").map((t) => parseInt(t)),
-};
+function loadConfiguration(): IConfiguration {
+  if (
+    !process.env.hasOwnProperty("TELEGRAM_BOT_TOKEN") ||
+    !process.env.hasOwnProperty("TELEGRAM_ALLOWED_USERS")
+  ) {
+    throw new Error("The bot needs environment variables to work");
+  }
+  let config = {
+    BotToken: process.env.TELEGRAM_BOT_TOKEN,
+    AllowedUsers: process.env.TELEGRAM_ALLOWED_USERS.split(",").map((t) => parseInt(t)),
+  };
+  return config;
+}
+
+export const Configuration: IConfiguration = loadConfiguration();

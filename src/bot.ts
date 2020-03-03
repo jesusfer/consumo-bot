@@ -15,14 +15,15 @@ export class ConsumoBot extends TelegramBot {
   constructor(configuration: IConfiguration) {
     super(configuration.BotToken, {polling: true});
     this.configuration = configuration;
-    let service = new AzureStorage({
-      storageAccount: configuration.AzureAccount,
-      storageKey: configuration.AzureKey,
-      tableName: configuration.AzureTableName,
-    });
+    const serviceOptions = {
+      storageAccount: process.env.AZURE_STORAGE_ACCOUNT,
+      storageKey: process.env.AZURE_STORAGE_KEY,
+      tableName: process.env.AZURE_TABLE_NAME,
+    };
+    let service = new AzureStorage().WithOptions(serviceOptions);
     this.storage = new BotStorage().WithService(service);
     d(`Allowed users: ${configuration.AllowedUsers}`);
-    d(`Table name: ${configuration.AzureTableName}`);
+    d(`Using storage: ${service.serviceName}`);
     this.SetupCommands();
   }
 
@@ -73,22 +74,22 @@ export class ConsumoBot extends TelegramBot {
     }
     let [, distance, volume, price, partialString, dateString] = match;
     let partial = partialString != undefined;
-    let date = new Date(Date.now());
+    let dateNow = new Date(Date.now());
     if (dateString != undefined) {
       let [, day, month, year] = this.dateRE.exec(dateString.trim());
-      date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+      dateNow = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
     }
     try {
       let reading = {
-        user: message.from.id,
-        volume: parseInt(volume),
-        price: parseInt(price),
-        distance: parseInt(distance),
-        partial,
-        date,
+        User: message.from.id,
+        Volume: parseInt(volume),
+        Price: parseInt(price),
+        Distance: parseInt(distance),
+        Partial: partial,
+        Date: dateNow,
       };
       let readingId = await this.storage.NewReading(reading);
-      let msg = `Reading #${readingId}: ${distance} km, ${volume} l at ${price} €/l on ${date.toDateString()}`;
+      let msg = `Reading #${readingId}: ${distance} km, ${volume} l at ${price} €/l on ${dateNow.toDateString()}`;
       this.sendMessage(message.from.id, msg);
       d(`${msg} (User: ${message.from.id})`);
     } catch (error) {
