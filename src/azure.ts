@@ -1,27 +1,33 @@
 // Copyright (c) 2020 Jesús Fernández <jesus@nublar.net>
 // MIT License
 
-const d = require("debug")("bot-azure");
+import {
+  IReading,
+  IStorageService,
+  IStorageKey,
+  StorageKeyType,
+  IBotStorageOptions,
+} from "./storage";
 
-const azure = require("azure-storage");
+const d = require("debug")("bot-azure");
+// const azure = require("azure-storage");
+import * as azure from "azure-storage";
 const entGen = azure.TableUtilities.entityGenerator;
 
-interface AzStorageOptions {
+interface IAzureStorageKey extends IStorageKey {
+  partition: string;
+  row: string;
+}
+
+interface IAzureStorageOptions extends IBotStorageOptions {
   storageAccount: string;
   storageKey: string;
   tableName: string;
 }
 
-interface IReading {
-  user: number;
-  volume: number;
-  price: number;
-  distance: number;
-  partial?: boolean;
-  date?: Date;
-}
+export class AzureStorage implements IAzureStorageOptions, IStorageService {
+  public serviceName: string = "Azure Table Storage";
 
-export class AzStorage implements AzStorageOptions {
   public storageAccount: string;
   public storageKey: string;
   public tableName: string;
@@ -29,7 +35,7 @@ export class AzStorage implements AzStorageOptions {
 
   private svc: any; // TODO:
 
-  constructor(options: AzStorageOptions) {
+  constructor(options: IAzureStorageOptions) {
     Object.assign(this, options);
     // this.storageAccount = options.storageAccount;
     // this.storageKey = options.storageKey;
@@ -38,7 +44,7 @@ export class AzStorage implements AzStorageOptions {
   }
 
   private Init(): Promise<boolean> {
-    if (this.svc != undefined) {
+    if (this.svc != undefined && this.initialized) {
       return Promise.resolve(true);
     }
     this.svc = azure.createTableService(this.storageAccount, this.storageKey);
@@ -54,6 +60,110 @@ export class AzStorage implements AzStorageOptions {
         }
       });
     });
+  }
+
+  public GetStorageKey(keyType: StorageKeyType, options?: any): IAzureStorageKey {
+    let newKey: IAzureStorageKey = {
+      keyType: keyType,
+      partition: undefined,
+      row: undefined,
+    };
+    switch (keyType) {
+      case StorageKeyType.LastReadingKey:
+        Object.assign(newKey, {
+          keyType: StorageKeyType.LastReadingKey,
+          partition: `LastUserRowKey`,
+          row: `User_${options.user}`,
+        });
+        break;
+      case StorageKeyType.ReadingKey:
+        Object.assign(newKey, {
+          keyType: StorageKeyType.LastReadingKey,
+          partition: `UserReadings`,
+          row: `Reading_${options.user}_${options.readingId}`,
+        });
+        break;
+      default:
+        throw new Error("KeyType not supported");
+    }
+    return newKey;
+  }
+
+  public async Get(key: IAzureStorageKey): Promise<any> {
+    await this.Init();
+    let promise = new Promise((resolve, reject) => {
+      this.svc.retrieveEntity(this.tableName, key.partition, key.row, (error, result) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      });
+    });
+    let getResult: any;
+    let getError: Error;
+    try {
+      getResult = await promise;
+    } catch (error) {
+      getError = error;
+    }
+    switch (key.keyType) {
+      case StorageKeyType.LastReadingKey:
+        if (getError) {
+          if (getError.message.indexOf("The specified resource does not exist.") >= 0) {
+            return Promise.resolve(1);
+          }
+          Promise.reject(getError);
+        } else {
+          let readingId = getResult.Last._ + 1;
+          Promise.resolve(readingId);
+        }
+        break;
+      case StorageKeyType.ReadingKey:
+        // TODO:
+        break;
+      default:
+        throw new Error("KeyType not supported");
+    }
+  }
+
+  public async Add(key: IStorageKey, entity: any): Promise<void> {
+    await this.Init();
+    let newEntity = this.ExtendEntityWithPartitionAndRowKeys(key as IAzureStorageKey, entity);
+    return new Promise((resolve, reject) => {
+      this.svc.insertEntity(this.tableName, newEntity, (error, result) => {
+        if (error) {
+          console.log(error);
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  public async AddOrUpdate(key: IStorageKey, entity: any): Promise<void> {
+    await this.Init();
+    let newEntity = this.ExtendEntityWithPartitionAndRowKeys(key as IAzureStorageKey, entity);
+    return new Promise((resolve, reject) => {
+      this.svc.insertOrReplaceEntity(this.tableName, newEntity, (error, result) => {
+        if (error) {
+          console.error(error);
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  private ExtendEntityWithPartitionAndRowKeys(key: IAzureStorageKey, entity: any): any {
+    let extras = {
+      PartitionKey: entGen.String(key.partition),
+      RowKey: entGen.String(key.row),
+    };
+    Object.assign(extras, entity);
+    return extras;
   }
 
   async GetNextReadingId(user: number): Promise<number> {

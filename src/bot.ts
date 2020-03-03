@@ -4,17 +4,17 @@
 const d = require("debug")("bot-bot");
 import {IConfiguration} from "./config";
 import TelegramBot, {Message} from "node-telegram-bot-api";
-import {AzStorage} from "./azure";
+import {AzureStorage} from "./azure";
 
 export class ConsumoBot extends TelegramBot {
   private configuration: IConfiguration;
-  private storage: AzStorage;
+  private storage: AzureStorage;
   private helpText = "This bot stores fuel consumption";
 
   constructor(configuration: IConfiguration) {
     super(configuration.BotToken, {polling: true});
     this.configuration = configuration;
-    this.storage = new AzStorage({
+    this.storage = new AzureStorage({
       storageAccount: configuration.AzureAccount,
       storageKey: configuration.AzureKey,
       tableName: configuration.AzureTableName,
