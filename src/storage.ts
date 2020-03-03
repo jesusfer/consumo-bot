@@ -21,22 +21,22 @@ export interface IStorageService {
 }
 
 export interface IReading {
-  user: number;
-  volume: number;
-  price: number;
-  distance: number;
-  partial?: boolean;
-  date?: Date;
-  readingId?: number;
+  User: number;
+  Volume: number;
+  Price: number;
+  Distance: number;
+  Partial?: boolean;
+  Date?: Date;
+  ReadingId?: number;
 }
 
 export interface ILastReading {
-  last: number;
+  Last: number;
 }
 
 export function newLastReading(readingId: number): ILastReading {
   return {
-    last: readingId,
+    Last: readingId,
   };
 }
 export interface IBotStorageOptions {}
@@ -49,12 +49,12 @@ interface IBotStorage {
 export class BotStorage implements IBotStorageOptions, IBotStorage {
   private service: IStorageService;
 
-  public WithOptions(options: IBotStorageOptions): BotStorage {
+  public WithOptions(options: IBotStorageOptions): this {
     Object.assign(this, options);
     return this;
   }
 
-  public WithService(service: IStorageService): BotStorage {
+  public WithService(service: IStorageService): this {
     this.service = service;
     return this;
   }
@@ -62,19 +62,21 @@ export class BotStorage implements IBotStorageOptions, IBotStorage {
   async GetNextReadingId(user: number): Promise<number> {
     d(`Getting next reading id for user ${user}`);
     let key = this.service.GetStorageKey(StorageKeyType.LastReadingKey, {
-      user: user,
+      User: user,
     });
     let result = (await this.service.Get(key)) as ILastReading;
-    d(`Next reading id for user is ${result.last}`);
-    return result.last;
+    d(`Next reading id for user is ${result.Last}`);
+    return result.Last;
   }
 
   async NewReading(options: IReading): Promise<number> {
     d(`Storing new reading`);
-    const newReadingId = await this.GetNextReadingId(options.user);
-    options.readingId = newReadingId;
-    const key = this.service.GetStorageKey(StorageKeyType.ReadingKey, options);
-    await this.service.Add(key, options);
+    const newReadingId = await this.GetNextReadingId(options.User);
+    options.ReadingId = newReadingId;
+    const newReadingKey = this.service.GetStorageKey(StorageKeyType.ReadingKey, options);
+    await this.service.Add(newReadingKey, options);
+    const lastReadingKey = this.service.GetStorageKey(StorageKeyType.LastReadingKey, options);
+    await this.service.AddOrUpdate(lastReadingKey, newLastReading(newReadingId));
     d(`New reading stored with id: ${newReadingId}`);
     return newReadingId;
   }
