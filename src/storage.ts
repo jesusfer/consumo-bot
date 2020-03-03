@@ -30,6 +30,15 @@ export interface IReading {
   readingId?: number;
 }
 
+export interface ILastReading {
+  last: number;
+}
+
+export function newLastReading(readingId: number): ILastReading {
+  return {
+    last: readingId,
+  };
+}
 export interface IBotStorageOptions {}
 
 interface IBotStorage {
@@ -37,11 +46,17 @@ interface IBotStorage {
   NewReading(reading: IReading): Promise<number>;
 }
 
-export class BotStorage<T extends IStorageService> implements IBotStorageOptions, IBotStorage {
-  public service: T;
+export class BotStorage implements IBotStorageOptions, IBotStorage {
+  private service: IStorageService;
 
-  constructor(options: IBotStorageOptions) {
+  public WithOptions(options: IBotStorageOptions): BotStorage {
     Object.assign(this, options);
+    return this;
+  }
+
+  public WithService(service: IStorageService): BotStorage {
+    this.service = service;
+    return this;
   }
 
   async GetNextReadingId(user: number): Promise<number> {
@@ -49,9 +64,9 @@ export class BotStorage<T extends IStorageService> implements IBotStorageOptions
     let key = this.service.GetStorageKey(StorageKeyType.LastReadingKey, {
       user: user,
     });
-    let result = await this.service.Get(key);
-    d(`Last reading id for user is ${result.Last}`);
-    return result.Last;
+    let result = (await this.service.Get(key)) as ILastReading;
+    d(`Next reading id for user is ${result.last}`);
+    return result.last;
   }
 
   async NewReading(options: IReading): Promise<number> {

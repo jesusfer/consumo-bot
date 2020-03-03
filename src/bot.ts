@@ -5,20 +5,22 @@ const d = require("debug")("bot-bot");
 import {IConfiguration} from "./config";
 import TelegramBot, {Message} from "node-telegram-bot-api";
 import {AzureStorage} from "./azure";
+import {BotStorage} from "./storage";
 
 export class ConsumoBot extends TelegramBot {
   private configuration: IConfiguration;
-  private storage: AzureStorage;
+  private storage: BotStorage;
   private helpText = "This bot stores fuel consumption";
 
   constructor(configuration: IConfiguration) {
     super(configuration.BotToken, {polling: true});
     this.configuration = configuration;
-    this.storage = new AzureStorage({
+    let service = new AzureStorage({
       storageAccount: configuration.AzureAccount,
       storageKey: configuration.AzureKey,
       tableName: configuration.AzureTableName,
     });
+    this.storage = new BotStorage().WithService(service);
     d(`Allowed users: ${configuration.AllowedUsers}`);
     d(`Table name: ${configuration.AzureTableName}`);
     this.SetupCommands();
@@ -51,11 +53,11 @@ export class ConsumoBot extends TelegramBot {
     });
     this.onText(/\/new .*/, (message: Message) => this.HandleNewMessage(message));
     this.onText(/\/stats/, (message: Message) => {
-      // TODO:
+      // TODO: Handle /stats command
     });
 
     this.onText(/\/clear/, (message: Message) => {
-      // TODO:
+      // TODO: Handle /clear command
     });
   }
 

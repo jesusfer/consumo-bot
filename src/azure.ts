@@ -2,15 +2,14 @@
 // MIT License
 
 import {
-  IReading,
   IStorageService,
   IStorageKey,
   StorageKeyType,
   IBotStorageOptions,
+  newLastReading,
 } from "./storage";
 
 const d = require("debug")("bot-azure");
-// const azure = require("azure-storage");
 import * as azure from "azure-storage";
 const entGen = azure.TableUtilities.entityGenerator;
 
@@ -33,7 +32,7 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   public tableName: string;
   private initialized: boolean;
 
-  private svc: any; // TODO:
+  private azureService: azure.TableService;
 
   constructor(options: IAzureStorageOptions) {
     Object.assign(this, options);
@@ -44,12 +43,13 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   }
 
   private Init(): Promise<boolean> {
-    if (this.svc != undefined && this.initialized) {
+    if (this.azureService != undefined && this.initialized) {
       return Promise.resolve(true);
     }
-    this.svc = azure.createTableService(this.storageAccount, this.storageKey);
+    d("AzureStorage.Init");
+    this.azureService = azure.createTableService(this.storageAccount, this.storageKey);
     return new Promise((resolve, reject) => {
-      this.svc.createTableIfNotExists(this.tableName, (error, result) => {
+      this.azureService.createTableIfNotExists(this.tableName, (error, result) => {
         if (error) {
           console.error(`Cannot create destination table: ${result}`);
           reject(error);
@@ -63,6 +63,7 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   }
 
   public GetStorageKey(keyType: StorageKeyType, options?: any): IAzureStorageKey {
+    d("AzureStorage.GetStorageKey");
     let newKey: IAzureStorageKey = {
       keyType: keyType,
       partition: undefined,
@@ -90,9 +91,10 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   }
 
   public async Get(key: IAzureStorageKey): Promise<any> {
+    d("AzureStorage.Get");
     await this.Init();
     let promise = new Promise((resolve, reject) => {
-      this.svc.retrieveEntity(this.tableName, key.partition, key.row, (error, result) => {
+      this.azureService.retrieveEntity(this.tableName, key.partition, key.row, (error, result) => {
         if (error) {
           reject(error);
         } else {
@@ -104,23 +106,26 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
     let getError: Error;
     try {
       getResult = await promise;
+      d("AzureStorage.Get: Got result");
     } catch (error) {
       getError = error;
+      d("AzureStorage.Get: Got error!");
     }
     switch (key.keyType) {
       case StorageKeyType.LastReadingKey:
+        d("AzureStorage.Get: LastReading result");
         if (getError) {
           if (getError.message.indexOf("The specified resource does not exist.") >= 0) {
-            return Promise.resolve(1);
+            return Promise.resolve(newLastReading(1));
           }
-          Promise.reject(getError);
+          return Promise.reject(getError);
         } else {
           let readingId = getResult.Last._ + 1;
-          Promise.resolve(readingId);
+          return Promise.resolve(newLastReading(readingId));
         }
-        break;
       case StorageKeyType.ReadingKey:
-        // TODO:
+        d("AzureStorage.Get: Reading result");
+        // TODO Return a Reading
         break;
       default:
         throw new Error("KeyType not supported");
@@ -128,10 +133,11 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   }
 
   public async Add(key: IStorageKey, entity: any): Promise<void> {
+    d("AzureStorage.Add");
     await this.Init();
     let newEntity = this.ExtendEntityWithPartitionAndRowKeys(key as IAzureStorageKey, entity);
     return new Promise((resolve, reject) => {
-      this.svc.insertEntity(this.tableName, newEntity, (error, result) => {
+      this.azureService.insertEntity(this.tableName, newEntity, (error, result) => {
         if (error) {
           console.log(error);
           reject(error);
@@ -143,10 +149,11 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   }
 
   public async AddOrUpdate(key: IStorageKey, entity: any): Promise<void> {
+    d("AzureStorage.AddOrUpdate");
     await this.Init();
     let newEntity = this.ExtendEntityWithPartitionAndRowKeys(key as IAzureStorageKey, entity);
     return new Promise((resolve, reject) => {
-      this.svc.insertOrReplaceEntity(this.tableName, newEntity, (error, result) => {
+      this.azureService.insertOrReplaceEntity(this.tableName, newEntity, (error, result) => {
         if (error) {
           console.error(error);
           reject(error);
@@ -165,7 +172,7 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
     Object.assign(extras, entity);
     return extras;
   }
-
+  /*
   async GetNextReadingId(user: number): Promise<number> {
     if (!this.initialized) {
       await this.Init();
@@ -173,7 +180,7 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
     let partition = `LastUserRowKey`;
     let row = `User_${user}`;
     return new Promise((resolve, reject) => {
-      this.svc.retrieveEntity(this.tableName, partition, row, (error, result) => {
+      this.azureService.retrieveEntity(this.tableName, partition, row, (error, result) => {
         if (error) {
           if (error.message.indexOf("The specified resource does not exist.") >= 0) {
             d(`First reading for user ${user}?`);
@@ -194,7 +201,7 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
       await this.Init();
     }
     return new Promise((resolve, reject) => {
-      this.svc.insertEntity(this.tableName, entity, (error, result) => {
+      this.azureService.insertEntity(this.tableName, entity, (error, result) => {
         if (error) {
           console.log(error);
           reject(error);
@@ -214,7 +221,7 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
       Last: entGen.Int32(rowId),
     };
     return new Promise((resolve, reject) => {
-      this.svc.insertOrReplaceEntity(this.tableName, entity, (error, result) => {
+      this.azureService.insertOrReplaceEntity(this.tableName, entity, (error, result) => {
         if (error) {
           reject(error);
         } else {
@@ -251,4 +258,5 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
   ClearReadings(user: number) {}
 
   Stats(user: number) {}
+  */
 }
