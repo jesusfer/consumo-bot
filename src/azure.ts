@@ -90,7 +90,6 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
 
   public async Get(key: IAzureStorageKey): Promise<any> {
     d("AzureStorage.Get");
-    console.log(key);
     await this.Init();
     let promise = new Promise((resolve, reject) => {
       this.azureService.retrieveEntity(this.tableName, key.partition, key.row, (error, result) => {
@@ -170,7 +169,6 @@ export class AzureStorage implements IAzureStorageOptions, IStorageService {
       RowKey: entGen.String(key.row),
     };
     Object.assign(extras, entity);
-    console.log(extras);
     return extras;
   }
 }
